@@ -40,8 +40,8 @@ class DynamoService:
             gsi1sk: Optional GSI1 sort key (numeric)
         """
         item = {
-            'pk': pk,
-            'sk': sk,
+            'PK': pk,
+            'SK': sk,
             **attributes
         }
         if gsi1pk is not None:
@@ -86,13 +86,13 @@ class DynamoService:
         Returns:
             List of matching items
         """
-        key_condition = Key('pk').eq(pk)
+        key_condition = Key('PK').eq(pk)
 
         if sk_begins_with:
-            key_condition = key_condition & Key('sk').begins_with(sk_begins_with)
+            key_condition = key_condition & Key('SK').begins_with(sk_begins_with)
         elif sk_between:
             start, end = sk_between
-            key_condition = key_condition & Key('sk').between(start, end)
+            key_condition = key_condition & Key('SK').between(start, end)
 
         query_params = {
             'KeyConditionExpression': key_condition,
@@ -125,7 +125,7 @@ class DynamoService:
         """
         query_params = {
             'IndexName': 'GSI1',
-            'KeyConditionExpression': Key('gsi1pk').eq(gsi1pk),
+            'KeyConditionExpression': Key('GSI1PK').eq(gsi1pk),
             'ScanIndexForward': ascending
         }
 
@@ -148,7 +148,7 @@ class DynamoService:
             Item dict if found, None otherwise
         """
         response = self.table.get_item(
-            Key={'pk': pk, 'sk': sk}
+            Key={'PK': pk, 'SK': sk}
         )
 
         return response.get('Item')
@@ -164,8 +164,8 @@ class DynamoService:
             True if item exists, False otherwise
         """
         response = self.table.get_item(
-            Key={'pk': pk, 'sk': sk},
-            ProjectionExpression='pk'
+            Key={'PK': pk, 'SK': sk},
+            ProjectionExpression='PK'
         )
 
         return 'Item' in response
@@ -182,7 +182,7 @@ class DynamoService:
             True if at least one item exists with this prefix
         """
         response = self.table.scan(
-            FilterExpression=Attr('pk').begins_with(pk_prefix),
+            FilterExpression=Attr('PK').begins_with(pk_prefix),
             Limit=1
         )
 
@@ -197,5 +197,5 @@ class DynamoService:
         """
         logger.info("Deleting item", extra={"pk": pk, "sk": sk})
         self.table.delete_item(
-            Key={'pk': pk, 'sk': sk}
+            Key={'PK': pk, 'SK': sk}
         )

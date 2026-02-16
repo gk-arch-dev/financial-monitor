@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal
 
 
 @dataclass
@@ -47,18 +48,18 @@ class SpreadRecord:
     def to_dynamo_item(self) -> dict:
         """Convert to DynamoDB put_item format with keys."""
         return {
-            'pk': f"BS#COUNTRY#{self.country_code}",
-            'sk': self.period,
-            'gsi1pk': f"BS#PERIOD#{self.period}",
-            'gsi1sk': self.spread_bps,
+            'PK': f"BS#COUNTRY#{self.country_code}",
+            'SK': self.period,
+            'GSI1PK': f"BS#PERIOD#{self.period}",
+            'GSI1SK': self.spread_bps,
             'country_code': self.country_code,
             'country_name': self.country_name,
             'currency': self.currency,
             'flag': self.flag,
             'period': self.period,
-            'yield_10y': self.yield_10y,
-            'yield_3m': self.yield_3m,
-            'spread_pct': self.spread_pct,
+            'yield_10y': Decimal(str(self.yield_10y)),
+            'yield_3m': Decimal(str(self.yield_3m)),
+            'spread_pct': Decimal(str(self.spread_pct)),
             'spread_bps': self.spread_bps,
             'is_inverted': self.is_inverted,
             'updated_at': self.updated_at

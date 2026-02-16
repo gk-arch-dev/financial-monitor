@@ -379,3 +379,10 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 .idea/
 
+# Lambda layer dependencies (generated from requirements.txt)
+backend/lambda-layer/
+
+# CDK deployment outputs and test responses
+infra/outputs.json
+infra/response.json
+

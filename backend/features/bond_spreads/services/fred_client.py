@@ -105,9 +105,9 @@ class FredClient:
         """
         from datetime import datetime, timedelta
 
-        # Check last 30 days
+        # Check last 6 months (OECD data has 2-3 month lag)
         end_date = datetime.now().strftime('%Y-%m-%d')
-        start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+        start_date = (datetime.now() - timedelta(days=180)).strftime('%Y-%m-%d')
 
         data = self.get_series(series_id, start_date, end_date)
         return len(data) > 0

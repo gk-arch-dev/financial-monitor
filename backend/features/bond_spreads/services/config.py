@@ -69,21 +69,15 @@ COUNTRIES: list[CountryConfig] = [
         series_10y="IRLTLT01AUM156N",  # Australia 10-Year
         series_3m="IR3TIB01AUM156N"    # Australia 3-Month
     ),
-    CountryConfig(
-        code="BR",
-        name="Brazil",
-        currency="BRL",
-        flag="🇧🇷",
-        series_10y="IRLTLT01BRM156N",  # Brazil 10-Year
-        series_3m="IR3TIB01BRM156N"    # Brazil 3-Month
-    ),
+    # Brazil removed: FRED doesn't have OECD-format long-term bond yield data for Brazil
+    # (not an OECD member, only has treasury bill data: INTGSTBRM193N)
     CountryConfig(
         code="IN",
         name="India",
         currency="INR",
         flag="🇮🇳",
-        series_10y="IRLTLT01INM156N",  # India 10-Year
-        series_3m="IR3TIB01INM156N"    # India 3-Month
+        series_10y="INDIRLTLT01STM",  # India 10-Year (OECD format different for non-members)
+        series_3m="INDIR3TIB01STM"    # India 3-Month (OECD format different for non-members)
     ),
     CountryConfig(
         code="MX",

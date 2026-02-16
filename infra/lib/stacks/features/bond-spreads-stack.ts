@@ -4,8 +4,7 @@ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as sns from 'aws-cdk-lib/aws-sns';
-import * as events from 'aws-cdk-lib/aws-events';
-import * as targets from 'aws-cdk-lib/aws-events-targets';
+import * as scheduler from 'aws-cdk-lib/aws-scheduler';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as cr from 'aws-cdk-lib/custom-resources';
 import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
@@ -25,7 +24,7 @@ export interface BondSpreadsStackProps extends cdk.StackProps {
 export class BondSpreadsStack extends cdk.Stack {
   public readonly ingestLambda: lambda.Function;
   public readonly backfillLambda: lambda.Function;
-  public readonly monthlyRule: events.Rule;
+  public readonly monthlySchedule: scheduler.CfnSchedule;
 
   constructor(scope: Construct, id: string, props: BondSpreadsStackProps) {
     super(scope, id, props);
@@ -44,14 +43,24 @@ export class BondSpreadsStack extends cdk.Stack {
     // Path to backend code
     const backendPath = path.join(__dirname, '../../../../backend');
 
+    // Lambda Layer with dependencies
+    const depsLayer = new lambda.LayerVersion(this, 'DependenciesLayer', {
+      code: lambda.Code.fromAsset(path.join(backendPath, 'lambda-layer')),
+      compatibleRuntimes: [lambda.Runtime.PYTHON_3_12],
+      description: 'Python dependencies for bond spreads handlers',
+    });
+
     // Ingest Lambda - runs monthly to fetch latest data
     this.ingestLambda = new lambda.Function(this, 'IngestLambda', {
       functionName: `fm-${props.stage}-bond-spreads-ingest`,
       runtime: lambda.Runtime.PYTHON_3_12,
       handler: 'features.bond_spreads.handlers.ingest.handler',
-      code: lambda.Code.fromAsset(backendPath),
-      memorySize: 128,
-      timeout: cdk.Duration.minutes(1),
+      code: lambda.Code.fromAsset(backendPath, {
+        exclude: ['lambda-layer', 'tests', '*.pyc', '__pycache__', '.pytest_cache'],
+      }),
+      layers: [depsLayer],
+      memorySize: 256,
+      timeout: cdk.Duration.minutes(5),
       environment: commonEnv,
     });
 
@@ -60,9 +69,12 @@ export class BondSpreadsStack extends cdk.Stack {
       functionName: `fm-${props.stage}-bond-spreads-backfill`,
       runtime: lambda.Runtime.PYTHON_3_12,
       handler: 'features.bond_spreads.handlers.backfill.handler',
-      code: lambda.Code.fromAsset(backendPath),
-      memorySize: 128,
-      timeout: cdk.Duration.minutes(1),
+      code: lambda.Code.fromAsset(backendPath, {
+        exclude: ['lambda-layer', 'tests', '*.pyc', '__pycache__', '.pytest_cache'],
+      }),
+      layers: [depsLayer],
+      memorySize: 512,
+      timeout: cdk.Duration.minutes(15),
       environment: commonEnv,
     });
 
@@ -87,14 +99,30 @@ export class BondSpreadsStack extends cdk.Stack {
       }));
     });
 
-    // EventBridge rule - 1st of every month at 08:00 UTC
-    this.monthlyRule = new events.Rule(this, 'MonthlyRule', {
-      ruleName: `fm-${props.stage}-bond-spreads-monthly`,
-      description: 'Triggers bond spreads ingest on the 1st of every month',
-      schedule: events.Schedule.expression('cron(0 8 1 * ? *)'),
+    // IAM role for EventBridge Scheduler
+    const scheduleRole = new iam.Role(this, 'ScheduleRole', {
+      assumedBy: new iam.ServicePrincipal('scheduler.amazonaws.com'),
     });
 
-    this.monthlyRule.addTarget(new targets.LambdaFunction(this.ingestLambda));
+    this.ingestLambda.grantInvoke(scheduleRole);
+
+    // EventBridge Scheduler - 16th of every month at 08:00 UTC
+    this.monthlySchedule = new scheduler.CfnSchedule(this, 'MonthlySchedule', {
+      name: `fm-${props.stage}-bond-spreads-monthly`,
+      description: 'Triggers bond spreads ingest on the 16th of every month',
+      scheduleExpression: 'cron(0 8 16 * ? *)',
+      scheduleExpressionTimezone: 'UTC',
+      flexibleTimeWindow: {
+        mode: 'OFF',
+      },
+      target: {
+        arn: this.ingestLambda.functionArn,
+        roleArn: scheduleRole.roleArn,
+        retryPolicy: {
+          maximumRetryAttempts: 2,
+        },
+      },
+    });
 
     // Custom Resource to trigger backfill on first deploy
     // The backfill handler should check if data exists and skip if populated
@@ -114,8 +142,8 @@ export class BondSpreadsStack extends cdk.Stack {
     // CloudWatch Alarms
     // =========================================================================
 
-    this.createLambdaAlarms(this.ingestLambda, 60, props.alertTopic, props.stage);
-    this.createLambdaAlarms(this.backfillLambda, 60, props.alertTopic, props.stage);
+    this.createLambdaAlarms(this.ingestLambda, 300, props.alertTopic, props.stage);
+    this.createLambdaAlarms(this.backfillLambda, 900, props.alertTopic, props.stage);
 
     // =========================================================================
     // Outputs
@@ -131,9 +159,9 @@ export class BondSpreadsStack extends cdk.Stack {
       description: 'Backfill Lambda ARN',
     });
 
-    new cdk.CfnOutput(this, 'MonthlyRuleName', {
-      value: this.monthlyRule.ruleName,
-      description: 'EventBridge rule name',
+    new cdk.CfnOutput(this, 'MonthlyScheduleName', {
+      value: this.monthlySchedule.name || '',
+      description: 'EventBridge schedule name',
     });
   }
 
