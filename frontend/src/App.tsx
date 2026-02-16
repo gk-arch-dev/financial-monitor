@@ -1,8 +1,20 @@
+import Header from '@shared/components/Header';
+import Footer from '@shared/components/Footer';
+import BondSpreadsDashboard from '@features/bond-spreads/components/BondSpreadsDashboard';
+
+import '@features/bond-spreads/styles/bond-spreads.css';
+import './App.css';
+
 function App() {
   return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', padding: '2rem' }}>
-      <h1>Financial Monitor</h1>
-      <p>Bond spreads dashboard coming soon...</p>
+    <div className="app">
+      <div className="container">
+        <Header />
+        <main>
+          <BondSpreadsDashboard />
+        </main>
+        <Footer />
+      </div>
     </div>
   );
 }

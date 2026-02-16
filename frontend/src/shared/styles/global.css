@@ -1,0 +1,116 @@
+/* Global styles - Reset, typography, base styles */
+
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Subtle noise overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  opacity: var(--noise-opacity, 0.025);
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Container */
+.container {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 0 36px;
+}
+
+/* Smooth theme transitions */
+body,
+.container,
+header,
+.filter-bar,
+.stat-card,
+.table-wrap,
+.spread-table thead th,
+.spread-table tbody tr,
+.chart-panel,
+.sidebar-panel,
+.sidebar-header,
+.sidebar-body,
+footer,
+.logo-mark,
+.filter-tag,
+.sort-btn,
+.time-btn,
+.inversion-item,
+.bar-track,
+.bar-fill,
+.toggle-track {
+  transition: background 0.35s ease, color 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
+}
+
+/* Light theme specific overrides */
+[data-theme="light"] .filter-bar {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .stats-row {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .table-wrap {
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .bottom-grid {
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .logo-mark {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .live-dot {
+  box-shadow: 0 0 6px var(--green);
+}
+
+[data-theme="light"] .bar-zero {
+  opacity: 0.25;
+}
+
+[data-theme="light"] body::before {
+  opacity: 0.012;
+}
+
+[data-theme="light"] .sidebar-header {
+  background: var(--surface2);
+}
+
+/* Responsive: Tablet */
+@media (max-width: 1024px) {
+  .container {
+    padding: 0 20px;
+  }
+}
+
+/* Responsive: Mobile */
+@media (max-width: 768px) {
+  .container {
+    padding: 0 16px;
+  }
+}
+
+/* Responsive: Small Mobile */
+@media (max-width: 420px) {
+  .container {
+    padding: 0 12px;
+  }
+}

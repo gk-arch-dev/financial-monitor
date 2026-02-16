@@ -1,0 +1,104 @@
+/* CSS Variables - Single source of truth for theming */
+
+:root {
+  /* Background & Surfaces */
+  --bg: #08090d;
+  --bg2: #0c0e14;
+  --surface: #11131a;
+  --surface2: #171a24;
+  --surface3: #1c2030;
+
+  /* Borders */
+  --border: #232838;
+  --border-light: #2d3348;
+
+  /* Brand Colors */
+  --gold: #c9a84c;
+  --gold-light: #e8d48b;
+  --gold-dim: #8a7234;
+  --gold-glow: rgba(201, 168, 76, 0.08);
+
+  /* Text */
+  --text: #e0ddd6;
+  --text-secondary: #a09b90;
+  --text-dim: #5e5c55;
+
+  /* Status Colors */
+  --green: #3dd68c;
+  --green-bright: #4aeaa0;
+  --green-dim: rgba(61, 214, 140, 0.12);
+  --red: #e8555a;
+  --red-bright: #ff6b6f;
+  --red-dim: rgba(232, 85, 90, 0.12);
+  --cyan: #5eb8d4;
+  --blue: #5b8def;
+  --chart-purple: #a078d0;
+
+  /* Component-specific */
+  --noise-opacity: 0.025;
+  --inv-border-alpha: rgba(232, 85, 90, 0.15);
+  --mover-border-alpha: rgba(35, 40, 56, 0.4);
+  --stat-border-alpha: rgba(35, 40, 56, 0.3);
+  --row-border-alpha: rgba(35, 40, 56, 0.5);
+  --row-hover: rgba(201, 168, 76, 0.025);
+
+  /* Bar visualization */
+  --bar-track: #1c2030;
+  --bar-green-shadow: rgba(61, 214, 140, 0.2);
+  --bar-red-shadow: rgba(232, 85, 90, 0.2);
+  --bar-green-start: rgba(61, 214, 140, 0.15);
+  --bar-red-start: rgba(232, 85, 90, 0.15);
+  --zero-line-opacity: 0.4;
+}
+
+/* Light Theme */
+[data-theme="light"] {
+  /* Background & Surfaces */
+  --bg: #f4f2ee;
+  --bg2: #edeae4;
+  --surface: #ffffff;
+  --surface2: #f9f8f5;
+  --surface3: #eeece7;
+
+  /* Borders */
+  --border: #ddd9d0;
+  --border-light: #ccc8bf;
+
+  /* Brand Colors */
+  --gold: #9a7b2e;
+  --gold-light: #7a6224;
+  --gold-dim: #b89c4a;
+  --gold-glow: rgba(154, 123, 46, 0.07);
+
+  /* Text */
+  --text: #1c1a16;
+  --text-secondary: #5c5850;
+  --text-dim: #9e9a90;
+
+  /* Status Colors */
+  --green: #0d8a50;
+  --green-bright: #10a060;
+  --green-dim: rgba(13, 138, 80, 0.1);
+  --red: #c0333a;
+  --red-bright: #d44048;
+  --red-dim: rgba(192, 51, 58, 0.08);
+  --cyan: #2a7d96;
+  --blue: #3b6bc4;
+  --chart-purple: #7a50b0;
+
+  /* Component-specific */
+  --noise-opacity: 0.015;
+  --inv-border-alpha: rgba(192, 51, 58, 0.12);
+  --mover-border-alpha: rgba(221, 217, 208, 0.8);
+  --stat-border-alpha: rgba(221, 217, 208, 0.6);
+  --row-border-alpha: rgba(221, 217, 208, 0.7);
+  --row-hover: rgba(154, 123, 46, 0.04);
+
+  /* Bar visualization */
+  --bar-track: #e8e5de;
+  --bar-green-shadow: rgba(13, 138, 80, 0.15);
+  --bar-red-shadow: rgba(192, 51, 58, 0.15);
+  --bar-green-start: rgba(13, 138, 80, 0.08);
+  --bar-red-start: rgba(192, 51, 58, 0.08);
+  --zero-line-opacity: 0.25;
+}
