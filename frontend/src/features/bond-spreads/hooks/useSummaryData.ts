@@ -5,7 +5,7 @@ export function useSummaryData() {
   return useQuery<SpreadSummaryResponse>({
     queryKey: ['bond-spreads', 'summary'],
     queryFn: async () => {
-      const response = await fetch('/data/bond-spreads/spreads-summary.json');
+      const response = await fetch('/data/bond-spreads/spreads-summary.json', { cache: 'no-cache' });
       if (!response.ok) {
         throw new Error('Failed to fetch summary data');
       }

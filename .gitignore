@@ -386,3 +386,7 @@ backend/lambda-layer/
 infra/outputs.json
 infra/response.json
 
+# LocalStack
+localstack/data/
+docker-compose.override.yml
+

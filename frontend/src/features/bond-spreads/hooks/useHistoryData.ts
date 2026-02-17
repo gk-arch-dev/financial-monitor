@@ -5,7 +5,7 @@ export function useHistoryData() {
   return useQuery<SpreadHistoryResponse>({
     queryKey: ['bond-spreads', 'history'],
     queryFn: async () => {
-      const response = await fetch('/data/bond-spreads/spreads-history.json');
+      const response = await fetch('/data/bond-spreads/spreads-history.json', { cache: 'no-cache' });
       if (!response.ok) {
         throw new Error('Failed to fetch history data');
       }

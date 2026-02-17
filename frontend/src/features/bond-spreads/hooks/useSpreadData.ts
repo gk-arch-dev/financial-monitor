@@ -5,7 +5,7 @@ export function useSpreadData() {
   return useQuery<SpreadLatestResponse>({
     queryKey: ['bond-spreads', 'latest'],
     queryFn: async () => {
-      const response = await fetch('/data/bond-spreads/spreads-latest.json');
+      const response = await fetch('/data/bond-spreads/spreads-latest.json', { cache: 'no-cache' });
       if (!response.ok) {
         throw new Error('Failed to fetch spread data');
       }

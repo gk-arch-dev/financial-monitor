@@ -32,7 +32,6 @@ def handler(event, context):
     bucket_name = os.environ["BUCKET_NAME"]
     distribution_id = os.environ["DISTRIBUTION_ID"]
     ssm_prefix = os.environ["SSM_PREFIX"]
-    region = os.environ.get("AWS_REGION", "eu-central-1")
 
     logger.info("Starting monthly bond spreads ingestion", extra={
         "feature": "bond-spreads",
@@ -40,7 +39,7 @@ def handler(event, context):
     })
 
     # 1. Check kill switch
-    if is_kill_switch_active(ssm_prefix, region):
+    if is_kill_switch_active(ssm_prefix):
         logger.warning("Kill switch is active, aborting ingestion", extra={
             "feature": "bond-spreads"
         })
@@ -52,7 +51,7 @@ def handler(event, context):
     # 2. Read FRED API key from SSM
     api_key_param = f"{ssm_prefix}/features/bond-spreads/fred-api-key"
     try:
-        api_key = get_secure_parameter(api_key_param, region)
+        api_key = get_secure_parameter(api_key_param)
     except Exception as e:
         logger.error("Failed to retrieve FRED API key from SSM", extra={
             "feature": "bond-spreads",
@@ -66,8 +65,7 @@ def handler(event, context):
         table_name=table_name,
         bucket_name=bucket_name,
         distribution_id=distribution_id,
-        api_key=api_key,
-        region=region
+        api_key=api_key
     )
 
     # 4. Determine target period (previous month)
@@ -82,105 +80,118 @@ def handler(event, context):
     skipped = 0
     errors = 0
 
-    for country in COUNTRIES:
-        country_pk = f"BS#COUNTRY#{country.code}"
+    # NEW: Check if all countries already have data - skip processing if so
+    all_exist = all(
+        dynamo_service.item_exists(pk=f"BS#COUNTRY#{country.code}", sk=target_period)
+        for country in COUNTRIES
+    )
 
-        # 5a. Skip if record exists (idempotent)
-        if dynamo_service.item_exists(pk=country_pk, sk=target_period):
-            logger.info("Record already exists, skipping", extra={
-                "feature": "bond-spreads",
-                "country": country.code,
-                "period": target_period
-            })
-            skipped += 1
-            continue
-
-        try:
-            # 5b. Fetch 10Y + 3M from FRED
-            logger.debug("Fetching FRED data", extra={
-                "feature": "bond-spreads",
-                "country": country.code,
-                "series_10y": country.series_10y,
-                "series_3m": country.series_3m
-            })
-
-            # Get data for the target month (first and last day of month)
-            start_date = f"{target_period}-01"
-            # Simple approach: use start of next month as end date
-            year, month = map(int, target_period.split('-'))
-            next_month = month + 1 if month < 12 else 1
-            next_year = year if month < 12 else year + 1
-            end_date = f"{next_year:04d}-{next_month:02d}-01"
-
-            data_10y = fred_client.get_series(
-                series_id=country.series_10y,
-                start_date=start_date,
-                end_date=end_date,
-                frequency="m"
-            )
-            data_3m = fred_client.get_series(
-                series_id=country.series_3m,
-                start_date=start_date,
-                end_date=end_date,
-                frequency="m"
-            )
-
-            # 5c. If no data → log error, skip country
-            if not data_10y or not data_3m:
-                logger.error("No FRED data available", extra={
+    if all_exist:
+        logger.info("All countries have data for period, skipping fetch", extra={
+            "feature": "bond-spreads",
+            "period": target_period
+        })
+        skipped = len(COUNTRIES)
+    else:
+        for country in COUNTRIES:
+            country_pk = f"BS#COUNTRY#{country.code}"
+    
+            # 5a. Skip if record exists (idempotent)
+            if dynamo_service.item_exists(pk=country_pk, sk=target_period):
+                logger.info("Record already exists, skipping", extra={
+                    "feature": "bond-spreads",
+                    "country": country.code,
+                    "period": target_period
+                })
+                skipped += 1
+                continue
+    
+            try:
+                # 5b. Fetch 10Y + 3M from FRED
+                logger.debug("Fetching FRED data", extra={
+                    "feature": "bond-spreads",
+                    "country": country.code,
+                    "series_10y": country.series_10y,
+                    "series_3m": country.series_3m
+                })
+    
+                # Get data for the target month (first and last day of month)
+                start_date = f"{target_period}-01"
+                # Simple approach: use start of next month as end date
+                year, month = map(int, target_period.split('-'))
+                next_month = month + 1 if month < 12 else 1
+                next_year = year if month < 12 else year + 1
+                end_date = f"{next_year:04d}-{next_month:02d}-01"
+    
+                data_10y = fred_client.get_series(
+                    series_id=country.series_10y,
+                    start_date=start_date,
+                    end_date=end_date,
+                    frequency="m"
+                )
+                data_3m = fred_client.get_series(
+                    series_id=country.series_3m,
+                    start_date=start_date,
+                    end_date=end_date,
+                    frequency="m"
+                )
+    
+                # 5c. If no data → log error, skip country
+                if not data_10y or not data_3m:
+                    logger.error("No FRED data available", extra={
+                        "feature": "bond-spreads",
+                        "country": country.code,
+                        "period": target_period,
+                        "has_10y": bool(data_10y),
+                        "has_3m": bool(data_3m)
+                    })
+                    errors += 1
+                    continue
+    
+                # Get the latest value from the month
+                yield_10y = float(data_10y[-1]["value"])
+                yield_3m = float(data_3m[-1]["value"])
+    
+                # 5d. Calculate spread and save to DynamoDB
+                spread_pct, spread_bps = spread_calculator.calculate_spread(yield_10y, yield_3m)
+                is_inverted = spread_calculator.is_inverted(spread_pct)
+    
+                record = SpreadRecord(
+                    country_code=country.code,
+                    country_name=country.name,
+                    currency=country.currency,
+                    flag=country.flag,
+                    period=target_period,
+                    yield_10y=yield_10y,
+                    yield_3m=yield_3m,
+                    spread_pct=spread_pct,
+                    spread_bps=spread_bps,
+                    is_inverted=is_inverted,
+                    updated_at=datetime.utcnow().isoformat() + "Z"
+                )
+    
+                # Save to DynamoDB
+                dynamo_service.table.put_item(Item=record.to_dynamo_item())
+    
+                logger.info("Saved spread record", extra={
                     "feature": "bond-spreads",
                     "country": country.code,
                     "period": target_period,
-                    "has_10y": bool(data_10y),
-                    "has_3m": bool(data_3m)
+                    "spread_bps": spread_bps,
+                    "is_inverted": is_inverted
                 })
+    
+                processed += 1
+    
+            except Exception as e:
+                logger.error("Failed to process country", extra={
+                    "feature": "bond-spreads",
+                    "country": country.code,
+                    "period": target_period,
+                    "error": str(e)
+                }, exc_info=True)
                 errors += 1
-                continue
-
-            # Get the latest value from the month
-            yield_10y = float(data_10y[-1]["value"])
-            yield_3m = float(data_3m[-1]["value"])
-
-            # 5d. Calculate spread and save to DynamoDB
-            spread_pct, spread_bps = spread_calculator.calculate_spread(yield_10y, yield_3m)
-            is_inverted = spread_calculator.is_inverted(spread_pct)
-
-            record = SpreadRecord(
-                country_code=country.code,
-                country_name=country.name,
-                currency=country.currency,
-                flag=country.flag,
-                period=target_period,
-                yield_10y=yield_10y,
-                yield_3m=yield_3m,
-                spread_pct=spread_pct,
-                spread_bps=spread_bps,
-                is_inverted=is_inverted,
-                updated_at=datetime.utcnow().isoformat() + "Z"
-            )
-
-            # Save to DynamoDB
-            dynamo_service.table.put_item(Item=record.to_dynamo_item())
-
-            logger.info("Saved spread record", extra={
-                "feature": "bond-spreads",
-                "country": country.code,
-                "period": target_period,
-                "spread_bps": spread_bps,
-                "is_inverted": is_inverted
-            })
-
-            processed += 1
-
-        except Exception as e:
-            logger.error("Failed to process country", extra={
-                "feature": "bond-spreads",
-                "country": country.code,
-                "period": target_period,
-                "error": str(e)
-            }, exc_info=True)
-            errors += 1
-            # Continue with other countries
+                # Continue with other countries
 
     # 6. Generate all 3 JSON files and upload to S3
     try:
@@ -190,7 +201,7 @@ def handler(event, context):
         })
 
         # Generate latest spreads
-        latest_data = json_generator.generate_latest(period=target_period)
+        latest_data = json_generator.generate_latest()
         s3_publisher.publish_json(
             key=f"{S3_DATA_PREFIX}/spreads-latest.json",
             data=latest_data
@@ -204,7 +215,7 @@ def handler(event, context):
         )
 
         # Generate summary
-        summary_data = json_generator.generate_summary(period=target_period)
+        summary_data = json_generator.generate_summary()
         s3_publisher.publish_json(
             key=f"{S3_DATA_PREFIX}/spreads-summary.json",
             data=summary_data

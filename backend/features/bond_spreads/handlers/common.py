@@ -15,8 +15,7 @@ def create_services(
     table_name: str,
     bucket_name: str,
     distribution_id: str,
-    api_key: str,
-    region: str = "eu-central-1"
+    api_key: str
 ):
     """Factory function to create all required services with proper dependency injection.
 
@@ -25,16 +24,14 @@ def create_services(
         bucket_name: S3 bucket name
         distribution_id: CloudFront distribution ID
         api_key: FRED API key
-        region: AWS region
 
     Returns:
         Tuple of (dynamo_service, s3_publisher, fred_client, spread_calculator, json_generator)
     """
-    dynamo_service = DynamoService(table_name=table_name, region=region)
+    dynamo_service = DynamoService(table_name=table_name)
     s3_publisher = S3Publisher(
         bucket_name=bucket_name,
-        distribution_id=distribution_id,
-        region=region
+        distribution_id=distribution_id
     )
     fred_client = FredClient(api_key=api_key)
     spread_calculator = SpreadCalculator()

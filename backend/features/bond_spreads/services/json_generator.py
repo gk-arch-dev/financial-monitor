@@ -18,41 +18,43 @@ class BondSpreadJsonGenerator:
         self.dynamo = dynamo_service
         self.calc = spread_calculator
 
-    def generate_latest(self, period: str) -> dict:
-        """Generate spreads-latest.json content.
-
-        Args:
-            period: Current period in YYYY-MM format
+    def generate_latest(self) -> dict:
+        """Generate spreads-latest.json content using each country's most recent record.
 
         Returns:
             JSON structure for latest spreads
         """
-        # Query GSI1 to get all countries for this period
-        gsi1pk = f"{DYNAMO_PK_PREFIX}#PERIOD#{period}"
-        items = self.dynamo.query_gsi1(gsi1pk, ascending=False)  # Sort by spread_bps descending
+        records = []
+        for country in COUNTRIES:
+            pk = f"{DYNAMO_PK_PREFIX}#COUNTRY#{country.code}"
+            items = self.dynamo.query_by_pk(pk, ascending=False, limit=1)
+            if items:
+                records.append(SpreadRecord.from_dynamo_item(items[0]))
 
-        countries = []
-        for item in items:
-            record = SpreadRecord.from_dynamo_item(item)
-            countries.append({
-                'code': record.country_code,
-                'name': record.country_name,
-                'currency': record.currency,
-                'flag': record.flag,
-                'yield_10y': record.yield_10y,
-                'yield_3m': record.yield_3m,
-                'spread_pct': record.spread_pct,
-                'spread_bps': record.spread_bps,
-                'is_inverted': record.is_inverted
-            })
+        # Sort by spread_bps descending
+        records.sort(key=lambda r: r.spread_bps, reverse=True)
 
-        # Calculate summary
-        spread_values = [c['spread_bps'] for c in countries]
+        # Most recent period across all countries
+        period = max((r.period for r in records), default='')
+
+        countries = [{
+            'code': r.country_code,
+            'name': r.country_name,
+            'currency': r.currency,
+            'flag': r.flag,
+            'yield_10y': r.yield_10y,
+            'yield_3m': r.yield_3m,
+            'spread_pct': r.spread_pct,
+            'spread_bps': r.spread_bps,
+            'is_inverted': r.is_inverted
+        } for r in records]
+
+        spread_values = [r.spread_bps for r in records]
         summary = {
             'avg_spread_bps': int(statistics.mean(spread_values)) if spread_values else 0,
             'median_spread_bps': int(statistics.median(spread_values)) if spread_values else 0,
-            'inverted_count': sum(1 for c in countries if c['is_inverted']),
-            'total_countries': len(countries)
+            'inverted_count': sum(1 for r in records if r.is_inverted),
+            'total_countries': len(records)
         }
 
         return {
@@ -96,20 +98,20 @@ class BondSpreadJsonGenerator:
             'countries': history
         }
 
-    def generate_summary(self, period: str) -> dict:
-        """Generate spreads-summary.json content.
-
-        Args:
-            period: Current period in YYYY-MM format
+    def generate_summary(self) -> dict:
+        """Generate spreads-summary.json content using each country's most recent record.
 
         Returns:
             JSON structure with summary statistics
         """
-        # Get current period data
-        gsi1pk = f"{DYNAMO_PK_PREFIX}#PERIOD#{period}"
-        items = self.dynamo.query_gsi1(gsi1pk, ascending=False)
+        records = []
+        for country in COUNTRIES:
+            pk = f"{DYNAMO_PK_PREFIX}#COUNTRY#{country.code}"
+            items = self.dynamo.query_by_pk(pk, ascending=False, limit=1)
+            if items:
+                records.append(SpreadRecord.from_dynamo_item(items[0]))
 
-        records = [SpreadRecord.from_dynamo_item(item) for item in items]
+        period = max((r.period for r in records), default='')
 
         if not records:
             return {

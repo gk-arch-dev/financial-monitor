@@ -17,19 +17,24 @@ def aws_credentials(monkeypatch):
 
 @pytest.fixture
 def dynamodb_table(aws_credentials):
-    """Create mock DynamoDB table."""
+    """Create mock DynamoDB table.
+
+    The DynamoService uses:
+    - Primary key: PK (uppercase), SK (uppercase)
+    - GSI1: gsi1pk (lowercase), gsi1sk (lowercase)
+    """
     with mock_aws():
         dynamodb = boto3.resource('dynamodb', region_name='eu-central-1')
 
         table = dynamodb.create_table(
             TableName='test-table',
             KeySchema=[
-                {'AttributeName': 'pk', 'KeyType': 'HASH'},
-                {'AttributeName': 'sk', 'KeyType': 'RANGE'}
+                {'AttributeName': 'PK', 'KeyType': 'HASH'},
+                {'AttributeName': 'SK', 'KeyType': 'RANGE'}
             ],
             AttributeDefinitions=[
-                {'AttributeName': 'pk', 'AttributeType': 'S'},
-                {'AttributeName': 'sk', 'AttributeType': 'S'},
+                {'AttributeName': 'PK', 'AttributeType': 'S'},
+                {'AttributeName': 'SK', 'AttributeType': 'S'},
                 {'AttributeName': 'gsi1pk', 'AttributeType': 'S'},
                 {'AttributeName': 'gsi1sk', 'AttributeType': 'N'}
             ],

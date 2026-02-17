@@ -1,9 +1,10 @@
 """Generic S3 upload and CloudFront invalidation."""
 
-import boto3
 import json
 import time
 from aws_lambda_powertools import Logger
+
+from shared.aws_config import create_client, get_endpoint_url
 
 logger = Logger()
 
@@ -11,16 +12,16 @@ logger = Logger()
 class S3Publisher:
     """Service for publishing JSON files to S3 and invalidating CloudFront cache."""
 
-    def __init__(self, bucket_name: str, distribution_id: str, region: str = "eu-central-1"):
+    def __init__(self, bucket_name: str, distribution_id: str):
         """Initialize S3 publisher.
 
         Args:
             bucket_name: Name of the S3 bucket
             distribution_id: CloudFront distribution ID for cache invalidation
-            region: AWS region (default: eu-central-1)
         """
-        self.s3_client = boto3.client('s3', region_name=region)
-        self.cf_client = boto3.client('cloudfront', region_name=region)
+        self.s3_client = create_client('s3')
+        # CloudFront is not available in LocalStack, skip when using local endpoint
+        self.cf_client = None if get_endpoint_url() else create_client('cloudfront')
         self.bucket_name = bucket_name
         self.distribution_id = distribution_id
 
@@ -38,7 +39,7 @@ class S3Publisher:
             Key=key,
             Body=json.dumps(data, indent=2),
             ContentType='application/json',
-            CacheControl='public, max-age=2592000, s-maxage=2592000'  # 30 days
+            CacheControl='public, max-age=3600, s-maxage=86400'  # browser: 1h, CDN: 24h
         )
 
     def invalidate_paths(self, paths: list[str]) -> None:
@@ -47,6 +48,11 @@ class S3Publisher:
         Args:
             paths: List of paths to invalidate (e.g., ['/data/bond-spreads/*'])
         """
+        # Skip CloudFront invalidation in LocalStack (CloudFront not available)
+        if self.cf_client is None:
+            logger.info("Skipping CloudFront invalidation (LocalStack mode)", extra={"paths": paths})
+            return
+
         caller_reference = f"fm-{int(time.time())}"
 
         logger.info("Creating CloudFront invalidation", extra={"paths": paths, "distribution": self.distribution_id})

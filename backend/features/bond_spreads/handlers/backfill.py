@@ -91,10 +91,13 @@ def handler(event, context):
     region = os.environ.get("AWS_REGION", "eu-central-1")
 
     request_type = event.get("RequestType", "Create")
+    country_code = event.get("country")  # NEW: Single country mode
+
     logger.info("Backfill handler invoked", extra={
         "feature": "bond-spreads",
         "stage": stage,
-        "request_type": request_type
+        "request_type": request_type,
+        "country": country_code
     })
 
     # Handle Delete/Update - just send success
@@ -110,7 +113,7 @@ def handler(event, context):
         # Read FRED API key first to fail fast if missing
         api_key_param = f"{ssm_prefix}/features/bond-spreads/fred-api-key"
         try:
-            api_key = get_secure_parameter(api_key_param, region)
+            api_key = get_secure_parameter(api_key_param)
         except Exception as e:
             logger.error("Failed to retrieve FRED API key from SSM", extra={
                 "feature": "bond-spreads",
@@ -125,46 +128,38 @@ def handler(event, context):
             table_name=table_name,
             bucket_name=bucket_name,
             distribution_id=distribution_id,
-            api_key=api_key,
-            region=region
+            api_key=api_key
         )
 
-        # 1. Check if data already exists for ALL countries
-        # Check if at least one country has data (to avoid full re-backfill if partially complete)
-        all_countries_loaded = all(
-            dynamo_service.has_items_with_prefix(f"BS#COUNTRY#{country.code}")
-            for country in COUNTRIES
-        )
-        if all_countries_loaded:
-            logger.info("Bond spread data already exists for all countries, skipping backfill", extra={
-                "feature": "bond-spreads",
-                "country_count": len(COUNTRIES)
-            })
-            send_cfn_response(event, context, "SUCCESS", data={
-                "Message": "Data already exists for all countries",
-                "Skipped": True
-            })
-            return {
-                "statusCode": 200,
-                "body": "Data already exists - skipped"
-            }
+        # 1. Check if data already exists (skip this check - let individual country checks handle it)
 
         # Calculate date range: 10 years of historical data
         end_date = datetime.utcnow()
         start_date = end_date - relativedelta(years=10)
 
+        # NEW: Filter to single country if specified
+        countries_to_process = COUNTRIES
+        if country_code:
+            countries_to_process = [c for c in COUNTRIES if c.code == country_code]
+            if not countries_to_process:
+                error_msg = f"Invalid country code: {country_code}"
+                logger.error(error_msg, extra={"feature": "bond-spreads"})
+                send_cfn_response(event, context, "FAILED", reason=error_msg)
+                return {"statusCode": 400, "body": error_msg}
+
         logger.info("Starting historical backfill", extra={
             "feature": "bond-spreads",
             "start_date": start_date.strftime("%Y-%m-%d"),
             "end_date": end_date.strftime("%Y-%m-%d"),
-            "countries": len(COUNTRIES)
+            "countries": len(countries_to_process),
+            "country_filter": country_code
         })
 
         total_records = 0
         failed_countries = []
 
         # 3. Process each country
-        for country in COUNTRIES:
+        for country in countries_to_process:
             try:
                 logger.info("Processing country", extra={
                     "feature": "bond-spreads",
@@ -280,59 +275,66 @@ def handler(event, context):
                 failed_countries.append(country.code)
                 # Continue with other countries
 
-        # 4. Generate JSON files and upload to S3
-        try:
-            logger.info("Generating JSON files after backfill", extra={
-                "feature": "bond-spreads"
-            })
-
-            # Get the latest period from the data
-            latest_period = end_date.strftime("%Y-%m")
-
-            # Generate latest spreads
-            latest_data = json_generator.generate_latest(period=latest_period)
-            s3_publisher.publish_json(
-                key=f"{S3_DATA_PREFIX}/spreads-latest.json",
-                data=latest_data
-            )
-
-            # Generate history
-            history_data = json_generator.generate_history(countries=COUNTRIES)
-            s3_publisher.publish_json(
-                key=f"{S3_DATA_PREFIX}/spreads-history.json",
-                data=history_data
-            )
-
-            # Generate summary
-            summary_data = json_generator.generate_summary(period=latest_period)
-            s3_publisher.publish_json(
-                key=f"{S3_DATA_PREFIX}/spreads-summary.json",
-                data=summary_data
-            )
-
-            logger.info("JSON files uploaded after backfill", extra={
+        # 4. Generate JSON files and upload to S3 (only when processing all countries)
+        # Skip JSON generation in single-country mode
+        if country_code:
+            logger.info("Skipping JSON generation (single country mode)", extra={
                 "feature": "bond-spreads",
-                "bucket": bucket_name,
-                "prefix": S3_DATA_PREFIX
+                "country": country_code
             })
-
-            # Invalidate CloudFront
+        else:
             try:
-                s3_publisher.invalidate_paths([f"/{S3_DATA_PREFIX}/*"])
-            except Exception as cf_error:
-                logger.error("Failed to invalidate CloudFront after backfill", extra={
-                    "feature": "bond-spreads",
-                    "error": str(cf_error)
-                }, exc_info=True)
-                # Don't fail backfill if CloudFront invalidation fails
+                logger.info("Generating JSON files after backfill", extra={
+                    "feature": "bond-spreads"
+                })
 
-        except Exception as e:
-            logger.error("Failed to generate JSON files after backfill", extra={
-                "feature": "bond-spreads",
-                "error": str(e)
-            }, exc_info=True)
-            send_cfn_response(event, context, "FAILED", reason=f"Failed to generate JSON: {str(e)}")
-            raise
+                # Get the latest period from the data
+                latest_period = end_date.strftime("%Y-%m")
+
+                # Generate latest spreads
+                latest_data = json_generator.generate_latest(period=latest_period)
+                s3_publisher.publish_json(
+                    key=f"{S3_DATA_PREFIX}/spreads-latest.json",
+                    data=latest_data
+                )
+
+                # Generate history
+                history_data = json_generator.generate_history(countries=COUNTRIES)
+                s3_publisher.publish_json(
+                    key=f"{S3_DATA_PREFIX}/spreads-history.json",
+                    data=history_data
+                )
+
+                # Generate summary
+                summary_data = json_generator.generate_summary(period=latest_period)
+                s3_publisher.publish_json(
+                    key=f"{S3_DATA_PREFIX}/spreads-summary.json",
+                    data=summary_data
+                )
+
+                logger.info("JSON files uploaded after backfill", extra={
+                    "feature": "bond-spreads",
+                    "bucket": bucket_name,
+                    "prefix": S3_DATA_PREFIX
+                })
+
+                # Invalidate CloudFront
+                try:
+                    s3_publisher.invalidate_paths([f"/{S3_DATA_PREFIX}/*"])
+                except Exception as cf_error:
+                    logger.error("Failed to invalidate CloudFront after backfill", extra={
+                        "feature": "bond-spreads",
+                        "error": str(cf_error)
+                    }, exc_info=True)
+                    # Don't fail backfill if CloudFront invalidation fails
+
+            except Exception as e:
+                logger.error("Failed to generate JSON files after backfill", extra={
+                    "feature": "bond-spreads",
+                    "error": str(e)
+                }, exc_info=True)
+                send_cfn_response(event, context, "FAILED", reason=f"Failed to generate JSON: {str(e)}")
+                raise
 
         # Update metadata
         try:

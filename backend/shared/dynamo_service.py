@@ -1,9 +1,10 @@
 """Generic DynamoDB operations for Financial Monitor."""
 
-import boto3
 from typing import Any
 from aws_lambda_powertools import Logger
 from boto3.dynamodb.conditions import Key, Attr
+
+from shared.aws_config import create_resource
 
 logger = Logger()
 
@@ -11,14 +12,13 @@ logger = Logger()
 class DynamoService:
     """Service for DynamoDB operations."""
 
-    def __init__(self, table_name: str, region: str = "eu-central-1"):
+    def __init__(self, table_name: str):
         """Initialize DynamoDB service with table resource.
 
         Args:
             table_name: Name of the DynamoDB table
-            region: AWS region (default: eu-central-1)
         """
-        dynamodb = boto3.resource('dynamodb', region_name=region)
+        dynamodb = create_resource('dynamodb')
         self.table = dynamodb.Table(table_name)
         self.table_name = table_name
 

@@ -18,8 +18,8 @@ def test_put_and_get_item(dynamodb_table):
 
     item = service.get_item('TEST#1', 'A')
     assert item is not None
-    assert item['pk'] == 'TEST#1'
-    assert item['sk'] == 'A'
+    assert item['PK'] == 'TEST#1'
+    assert item['SK'] == 'A'
     assert item['data'] == 'value'
     assert item['gsi1pk'] == 'GSI#1'
     assert item['gsi1sk'] == 100
@@ -44,8 +44,8 @@ def test_query_by_pk(dynamodb_table):
 
     results = service.query_by_pk('PK#1')
     assert len(results) == 3
-    assert results[0]['sk'] == 'A'
-    assert results[2]['sk'] == 'C'
+    assert results[0]['SK'] == 'A'
+    assert results[2]['SK'] == 'C'
 
 
 def test_query_gsi1(dynamodb_table):
@@ -69,7 +69,7 @@ def test_batch_put_items(dynamodb_table):
     service = DynamoService(table_name='test-table')
 
     items = [
-        {'pk': f'BATCH#{i}', 'sk': 'A', 'value': i}
+        {'PK': f'BATCH#{i}', 'SK': 'A', 'value': i}
         for i in range(30)  # Test > 25 items (batch limit)
     ]
 

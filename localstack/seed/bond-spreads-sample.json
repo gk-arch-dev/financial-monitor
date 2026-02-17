@@ -1,0 +1,71 @@
+{
+  "period": "2026-01",
+  "generated_at": "2026-01-16T08:00:00Z",
+  "countries": [
+    {
+      "code": "US",
+      "name": "United States",
+      "currency": "USD",
+      "flag": "us",
+      "yield_10y": 4.25,
+      "yield_3m": 4.50,
+      "spread_pct": -0.25,
+      "spread_bps": -25,
+      "is_inverted": true,
+      "previous_spread_bps": -20,
+      "delta_bps": -5
+    },
+    {
+      "code": "DE",
+      "name": "Germany",
+      "currency": "EUR",
+      "flag": "de",
+      "yield_10y": 2.35,
+      "yield_3m": 2.80,
+      "spread_pct": -0.45,
+      "spread_bps": -45,
+      "is_inverted": true,
+      "previous_spread_bps": -40,
+      "delta_bps": -5
+    },
+    {
+      "code": "GB",
+      "name": "United Kingdom",
+      "currency": "GBP",
+      "flag": "gb",
+      "yield_10y": 4.10,
+      "yield_3m": 4.30,
+      "spread_pct": -0.20,
+      "spread_bps": -20,
+      "is_inverted": true,
+      "previous_spread_bps": -15,
+      "delta_bps": -5
+    },
+    {
+      "code": "JP",
+      "name": "Japan",
+      "currency": "JPY",
+      "flag": "jp",
+      "yield_10y": 1.05,
+      "yield_3m": 0.10,
+      "spread_pct": 0.95,
+      "spread_bps": 95,
+      "is_inverted": false,
+      "previous_spread_bps": 90,
+      "delta_bps": 5
+    },
+    {
+      "code": "FR",
+      "name": "France",
+      "currency": "EUR",
+      "flag": "fr",
+      "yield_10y": 2.95,
+      "yield_3m": 2.80,
+      "spread_pct": 0.15,
+      "spread_bps": 15,
+      "is_inverted": false,
+      "previous_spread_bps": 10,
+      "delta_bps": 5
+    }
+  ]
+}
