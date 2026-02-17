@@ -18,11 +18,11 @@ class FredClient:
 
         Args:
             api_key: FRED API key from SSM
-            rate_limit: Requests per hour (default 120 to be safe)
+            rate_limit: Requests per minute (FRED allows 120/min)
         """
         self.api_key = api_key
         self.rate_limit = rate_limit
-        self.min_interval = 3600 / rate_limit  # Seconds between requests
+        self.min_interval = 60 / rate_limit  # Seconds between requests
         self.last_request_time = 0
 
     def _wait_for_rate_limit(self) -> None:

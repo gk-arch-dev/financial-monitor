@@ -198,7 +198,7 @@ export default function HistoryChart({ historyData, countries }: HistoryChartPro
               {/* Area fill for first country */}
               {chartData.selectedData.length > 0 && (
                 <path
-                  d={`M${generatePath(
+                  d={`${generatePath(
                     chartData.selectedData[0].points,
                     chartData.allPeriods,
                     chartData.maxBps,
